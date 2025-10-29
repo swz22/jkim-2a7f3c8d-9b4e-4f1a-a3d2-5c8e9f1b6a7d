@@ -1,101 +1,372 @@
-# TurbovetsTaskManager
+# TurboVets Task Manager
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+A secure, role-based task management system demonstrating enterprise-grade authentication, authorization, and multi-tenant data isolation.
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+**GitHub Repository:** https://github.com/swz22/turbovets-task-manager
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+---
 
-## Run tasks
+## Setup Instructions
 
-To run the dev server for your app, use:
+### Prerequisites
 
-```sh
-npx nx serve turbovets-task-manager
+- Node.js 18+
+- Docker & Docker Compose
+- Git
+
+### Quick Start
+
+```bash
+# 1. Clone repository
+git clone https://github.com/swz22/turbovets-task-manager.git
+cd turbovets-task-manager
+
+# 2. Install dependencies
+npm install
+
+# 3. Start PostgreSQL
+docker-compose up -d
+
+# 4. Run application (both frontend and backend)
+npm run dev
 ```
 
-To create a production bundle:
+**Access the application:**
 
-```sh
-npx nx build turbovets-task-manager
+- Frontend: http://localhost:4200
+- Backend API: http://localhost:3000/api
+
+**First-time setup:**
+
+1. Navigate to http://localhost:4200
+2. Click "Create one" to register
+3. Fill in your details and organization name
+4. You'll be logged in as OWNER with full permissions
+
+---
+
+## Architecture & Design Rationale
+
+### Technology Stack
+
+**Backend:** NestJS + TypeORM + PostgreSQL  
+**Frontend:** Angular 18 (standalone components) + TailwindCSS  
+**Infrastructure:** NX Monorepo + Docker
+
+### Monorepo Structure
+
+```
+turbovets-task-manager/
+├── apps/
+│   ├── api/                 # NestJS backend
+│   │   ├── auth/           # JWT authentication
+│   │   ├── database/       # TypeORM entities
+│   │   ├── task/           # Task CRUD operations
+│   │   └── user/           # User management
+│   │
+│   └── web/                # Angular frontend
+│       ├── components/     # Login, Tasks, Users
+│       ├── services/       # API integration
+│       └── guards/         # Route protection
+│
+└── libs/shared-types/      # Shared DTOs and types
 ```
 
-To see all available targets to run for a project, run:
+### Database Design
 
-```sh
-npx nx show project turbovets-task-manager
+**Key entities:** Organization → Users → Tasks
+
+Every entity includes `organizationId` to enforce data isolation. This multi-tenant architecture ensures users can only access data within their organization.
+
+**Entity relationships:**
+
+- Organization has many Users and Tasks
+- User belongs to one Organization
+- Task belongs to one Organization
+- Task has creator and optional assignee (both Users)
+
+### Design Decisions
+
+**1. Organization-Level Scoping**
+
+All database queries filter by `organizationId`:
+
+```typescript
+const tasks = await this.taskRepository.find({
+  where: { organizationId: currentUser.organizationId },
+});
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+This prevents data leakage between organizations and enables true multi-tenant architecture.
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+**2. Service-Layer Authorization**
 
-## Add new projects
+Rather than relying solely on route guards, authorization is enforced at the service layer:
 
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/nest:app demo
+```typescript
+// RBAC check before database operation
+if (currentUser.role === UserRole.MEMBER && task.createdById !== currentUser.id) {
+  throw new ForbiddenException('Members can only delete their own tasks');
+}
 ```
 
-To generate a new library, use:
+This provides defense-in-depth security.
 
-```sh
-npx nx g @nx/node:lib mylib
+**3. JWT with Refresh Tokens**
+
+- Access tokens: 15 minutes (limits exposure)
+- Refresh tokens: 7 days (better UX)
+- Tokens include userId, organizationId, and role for authorization
+
+**4. NX Monorepo**
+
+Enables code sharing (shared-types library) between frontend and backend, ensuring type safety across the full stack.
+
+---
+
+## Access Control & User Roles
+
+### Role Hierarchy
+
+**OWNER**
+
+- First user who creates the organization
+- Can create OWNER, ADMIN, and MEMBER users
+- Full access to all tasks and user management
+
+**ADMIN**
+
+- Can create ADMIN and MEMBER users (not OWNERs)
+- Full access to all tasks
+- Can manage any task in the organization
+
+**MEMBER**
+
+- Cannot create users
+- Can view all tasks but only edit/delete their own
+- Limited task management permissions
+
+### Security Implementation
+
+**Authentication Flow:**
+
+1. User registers → Creates organization + OWNER account
+2. User logs in → Receives JWT access token + refresh token
+3. All API requests include `Authorization: Bearer <token>` header
+4. Backend validates JWT and extracts user context
+
+**Authorization Enforcement:**
+
+Global JWT guard protects all routes by default:
+
+```typescript
+@UseGuards(JwtAuthGuard) // Applied globally
+export class AppModule {}
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+Public endpoints explicitly opt-out:
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
+```typescript
+@Public()
+@Post('login')
+async login() { ... }
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+Role-based checks in services:
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+```typescript
+// Only OWNER/ADMIN can add users
+if (currentUser.role === UserRole.MEMBER) {
+  throw new ForbiddenException('Only owners and admins can add users');
+}
 ```
 
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+**Key Security Features:**
 
-## Install Nx Console
+- Passwords hashed with bcrypt (10 rounds)
+- JWT secrets in environment variables
+- Organization-scoped database queries
+- TypeORM prevents SQL injection
+- CORS restricted to frontend origin
 
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
+---
 
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+## Example Workflows
 
-## Useful links
+### Workflow 1: User Registration & Task Creation
 
-Learn more:
+```bash
+# 1. Register new organization
+curl -X POST http://localhost:3000/api/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "owner@company.com",
+    "password": "secure123",
+    "firstName": "Jane",
+    "lastName": "Smith",
+    "organizationName": "Acme Corp"
+  }'
 
-- [Learn more about this workspace setup](https://nx.dev/nx-api/nest?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# Response includes accessToken and user details
 
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# 2. Create a task
+curl -X POST http://localhost:3000/api/tasks \
+  -H "Authorization: Bearer <ACCESS_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Implement authentication",
+    "description": "Add JWT auth to API"
+  }'
+
+# 3. Get all tasks (organization-scoped)
+curl -X GET http://localhost:3000/api/tasks \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+### Workflow 2: User Management
+
+```bash
+# 1. Login as OWNER
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "owner@company.com",
+    "password": "secure123"
+  }'
+
+# 2. Add ADMIN user to organization
+curl -X POST http://localhost:3000/api/users \
+  -H "Authorization: Bearer <OWNER_TOKEN>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@company.com",
+    "firstName": "Bob",
+    "lastName": "Johnson",
+    "role": "ADMIN"
+  }'
+
+# Response includes temporary password to share with new user
+
+# 3. New user logs in with temp password
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "admin@company.com",
+    "password": "<TEMP_PASSWORD>"
+  }'
+```
+
+### Workflow 3: Testing Organization Isolation
+
+**Test:** Verify users in different organizations cannot see each other's data
+
+1. Register User A with "Company A" → Create tasks
+2. Register User B with "Company B" → Create tasks
+3. As User A, call GET /api/tasks → See only Company A tasks
+4. As User B, call GET /api/tasks → See only Company B tasks
+
+**Expected result:** Complete data isolation between organizations.
+
+### Workflow 4: Role-Based Permissions
+
+**Test:** Verify MEMBER cannot delete other users' tasks
+
+1. Login as OWNER → Create Task 1
+2. Add MEMBER user → Login as MEMBER
+3. As MEMBER, create Task 2 → Can delete Task 2 ✓
+4. As MEMBER, try to delete Task 1 → Forbidden ✗
+
+**Expected result:** 403 Forbidden error when MEMBER tries to delete OWNER's task.
+
+### UI Workflow
+
+1. **Register** → Navigate to http://localhost:4200 → Create account
+2. **Create Tasks** → Click "+ Create New Task" → Fill form → Submit
+3. **Edit Tasks** → Click "Edit" on any task → Modify inline → Save
+4. **Manage Team** → Click "Team" → Add users with roles → Note temp password
+5. **Logout** → Click "Sign Out" → Try accessing /tasks → Redirected to login
+
+---
+
+## Future Improvements
+
+### High Priority
+
+**Force Password Change on First Login**
+
+- New users with temporary passwords should be required to change their password immediately
+- Improves security and ensures users have control over credentials
+
+**User Deletion**
+
+- OWNER/ADMIN should be able to remove users from organization
+- Include confirmation dialog: "Are you sure you want to remove this user?"
+- Soft delete vs. hard delete considerations for audit trail
+
+**Email Notifications**
+
+- Send temporary passwords via email instead of displaying in UI
+- Password reset links for forgotten passwords
+- Task assignment notifications
+
+### Additional Features
+
+**Task Enhancements**
+
+- Task assignment to specific users
+- Due dates and priority levels
+- Task comments for collaboration
+- Search and advanced filtering
+
+**Security Improvements**
+
+- Two-factor authentication (2FA)
+- Rate limiting on authentication endpoints
+- Session management (view/revoke active sessions)
+
+**Audit & Analytics**
+
+- Complete audit logging for all CRUD operations
+- Dashboard with task completion metrics
+- Activity timeline
+
+**Technical Debt**
+
+- Unit and integration tests with Jest
+- E2E tests with Cypress/Playwright
+- API documentation with Swagger/OpenAPI
+- Pagination for large datasets
+- WebSocket support for real-time updates
+
+---
+
+## Design Highlights
+
+**Core Strengths:**
+
+1. **Security-First Architecture** - Every query enforces organization scoping; authorization happens at the service layer
+2. **Type Safety** - Shared types library eliminates type mismatches between frontend/backend
+3. **Production Patterns** - JWT refresh tokens, password hashing, global auth guards
+4. **Developer Experience** - Single command to run everything (`npm run dev`)
+
+**Key Trade-offs:**
+
+- Chose inline editing over modal forms (faster UX, simpler code)
+- Temporary passwords shown in UI vs. email (faster for assessment demo)
+- Service-layer authorization over complex guard hierarchy (more maintainable)
+
+---
+
+## Development Notes
+
+**AI Assistance:** This project was developed with some AI assistance. All design decisions, implementation details, and architectural choices were made with full understanding and can be explained in depth.
+
+---
+
+## Contact
+
+**John Kim**
+E-mail: jkdev220@gmail.com  
+GitHub: [@swz22](https://github.com/swz22)
+
+Thank you for the opportunity to work on this assessment!
