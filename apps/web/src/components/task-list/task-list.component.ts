@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { TaskService } from '../../services/task.service';
 import { AuthService } from '../../services/auth.service';
 import { TaskDto, CreateTaskDto } from '@turbovets-task-manager/shared-types';
@@ -8,7 +9,7 @@ import { TaskDto, CreateTaskDto } from '@turbovets-task-manager/shared-types';
 @Component({
   selector: 'app-task-list',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, RouterModule],
   templateUrl: './task-list.component.html',
 })
 export class TaskListComponent implements OnInit {

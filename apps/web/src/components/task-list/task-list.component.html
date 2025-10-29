@@ -18,12 +18,20 @@
         </p>
         }
       </div>
-      <button
-        (click)="onLogout()"
-        class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50"
-      >
-        Sign Out
-      </button>
+      <div class="flex gap-3">
+        <a
+          routerLink="/users"
+          class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Team
+        </a>
+        <button
+          (click)="onLogout()"
+          class="px-4 py-2 text-sm text-gray-700 hover:text-gray-900 border border-gray-300 rounded-md hover:bg-gray-50"
+        >
+          Sign Out
+        </button>
+      </div>
     </div>
   </header>
 

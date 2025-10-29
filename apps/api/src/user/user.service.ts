@@ -33,7 +33,7 @@ export class UserService {
       throw new ConflictException('User with this email already exists');
     }
 
-    // Only OWNER can create other OWNERS
+    // Only OWNER can create other OWNERs
     if (role === UserRole.OWNER && currentUser.role !== UserRole.OWNER) {
       throw new ForbiddenException('Only owners can create other owners');
     }
@@ -51,12 +51,22 @@ export class UserService {
       organizationId: currentUser.organizationId,
     });
 
-    await this.userRepository.save(user);
+    const savedUser = await this.userRepository.save(user);
+
+    // Load user with organization relation
+    const userWithOrg = await this.userRepository.findOne({
+      where: { id: savedUser.id },
+      relations: ['organization'],
+    });
+
+    if (!userWithOrg) {
+      throw new Error('Failed to load user after creation');
+    }
 
     // In production, send email with temp password
     console.log(`Temporary password for ${email}: ${tempPassword}`);
 
-    return this.toDto(user);
+    return this.toDto(userWithOrg);
   }
 
   async findAllInOrganization(currentUser: User): Promise<UserDto[]> {
@@ -83,7 +93,7 @@ export class UserService {
   }
 
   private generateTempPassword(): string {
-    // Random 12 character password
+    // Generate random 12 character password
     const chars =
       'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%';
     let password = '';
