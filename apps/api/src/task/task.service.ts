@@ -12,80 +12,95 @@ import {
   UpdateTaskDto,
   TaskDto,
 } from '@turbovets-task-manager/shared-types';
+import { AuditLogService } from '../audit-log/audit-log.service';
 
 @Injectable()
 export class TaskService {
   constructor(
     @InjectRepository(Task)
     private taskRepository: Repository<Task>,
-    @InjectRepository(User)
-    private userRepository: Repository<User>
+    private auditLogService: AuditLogService
   ) {}
 
   async create(
     createTaskDto: CreateTaskDto,
     currentUser: User
   ): Promise<TaskDto> {
-    const { title, description, assigneeId } = createTaskDto;
-
-    // Validate assignee belongs to same organization
-    if (assigneeId) {
-      const assignee = await this.userRepository.findOne({
-        where: { id: assigneeId, organizationId: currentUser.organizationId },
-      });
-      if (!assignee) {
-        throw new ForbiddenException('Assignee must be in your organization');
-      }
-    }
-
     const task = this.taskRepository.create({
-      title,
-      description,
-      completed: false,
-      organizationId: currentUser.organizationId,
+      title: createTaskDto.title,
+      description: createTaskDto.description,
+      assigneeId: createTaskDto.assigneeId,
       createdById: currentUser.id,
-      assigneeId: assigneeId || currentUser.id,
+      organizationId: currentUser.organizationId,
     });
 
     const savedTask = await this.taskRepository.save(task);
-    return this.toDto(await this.findOneById(savedTask.id, currentUser));
+
+    // Log the action
+    await this.auditLogService.log(
+      'CREATE_TASK',
+      'Task',
+      savedTask.id,
+      currentUser.id,
+      currentUser.organizationId,
+      { title: savedTask.title }
+    );
+
+    const taskWithRelations = await this.taskRepository.findOne({
+      where: { id: savedTask.id },
+      relations: ['createdBy', 'assignee'],
+    });
+
+    if (!taskWithRelations) {
+      throw new Error('Failed to load task after creation');
+    }
+
+    return this.toDto(taskWithRelations);
   }
 
   async findAll(currentUser: User): Promise<TaskDto[]> {
     let tasks: Task[];
 
-    // RBAC: OWNER and ADMIN see all org tasks, MEMBER sees only assigned tasks
-    if (
-      currentUser.role === UserRole.OWNER ||
-      currentUser.role === UserRole.ADMIN
-    ) {
+    if (currentUser.role === UserRole.MEMBER) {
+      // Members only see their own tasks
+      tasks = await this.taskRepository.find({
+        where: {
+          organizationId: currentUser.organizationId,
+          createdById: currentUser.id,
+        },
+        relations: ['createdBy', 'assignee'],
+        order: { createdAt: 'DESC' },
+      });
+    } else {
+      // Owners and Admins see all tasks in their organization
       tasks = await this.taskRepository.find({
         where: { organizationId: currentUser.organizationId },
         relations: ['createdBy', 'assignee'],
         order: { createdAt: 'DESC' },
       });
-    } else {
-      // MEMBER: only see tasks they created or are assigned to
-      tasks = await this.taskRepository
-        .createQueryBuilder('task')
-        .leftJoinAndSelect('task.createdBy', 'createdBy')
-        .leftJoinAndSelect('task.assignee', 'assignee')
-        .where('task.organizationId = :orgId', {
-          orgId: currentUser.organizationId,
-        })
-        .andWhere('(task.createdById = :userId OR task.assigneeId = :userId)', {
-          userId: currentUser.id,
-        })
-        .orderBy('task.createdAt', 'DESC')
-        .getMany();
     }
 
     return tasks.map((task) => this.toDto(task));
   }
 
   async findOne(id: string, currentUser: User): Promise<TaskDto> {
-    const task = await this.findOneById(id, currentUser);
-    this.checkAccess(task, currentUser);
+    const task = await this.taskRepository.findOne({
+      where: { id, organizationId: currentUser.organizationId },
+      relations: ['createdBy', 'assignee'],
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
+    }
+
+    // Members can only view their own tasks
+    if (
+      currentUser.role === UserRole.MEMBER &&
+      task.createdById !== currentUser.id
+    ) {
+      throw new ForbiddenException('You can only view your own tasks');
+    }
+
     return this.toDto(task);
   }
 
@@ -94,90 +109,67 @@ export class TaskService {
     updateTaskDto: UpdateTaskDto,
     currentUser: User
   ): Promise<TaskDto> {
-    const task = await this.findOneById(id, currentUser);
-    this.checkAccess(task, currentUser);
-
-    const { title, description, assigneeId, completed } = updateTaskDto;
-
-    // Validate assignee if provided
-    if (assigneeId !== undefined) {
-      if (assigneeId === null) {
-        task.assigneeId = null;
-      } else {
-        const assignee = await this.userRepository.findOne({
-          where: { id: assigneeId, organizationId: currentUser.organizationId },
-        });
-        if (!assignee) {
-          throw new ForbiddenException('Assignee must be in your organization');
-        }
-        task.assigneeId = assigneeId;
-      }
-    }
-
-    if (title !== undefined) task.title = title;
-    if (description !== undefined) task.description = description;
-    if (completed !== undefined) task.completed = completed;
-
-    await this.taskRepository.save(task);
-    return this.toDto(await this.findOneById(id, currentUser));
-  }
-
-  async remove(id: string, currentUser: User): Promise<void> {
-    const task = await this.findOneById(id, currentUser);
-
-    // RBAC: Only OWNER/ADMIN can delete any task, MEMBER can only delete their own
-    if (
-      currentUser.role === UserRole.MEMBER &&
-      task.createdById !== currentUser.id
-    ) {
-      throw new ForbiddenException(
-        'Members can only delete tasks they created'
-      );
-    }
-
-    this.checkAccess(task, currentUser);
-    await this.taskRepository.remove(task);
-  }
-
-  private async findOneById(id: string, currentUser: User): Promise<Task> {
     const task = await this.taskRepository.findOne({
       where: { id, organizationId: currentUser.organizationId },
-      relations: ['createdBy', 'assignee', 'organization'],
+      relations: ['createdBy', 'assignee'],
     });
 
     if (!task) {
       throw new NotFoundException('Task not found');
     }
 
-    return task;
+    // Members can only edit their own tasks
+    if (
+      currentUser.role === UserRole.MEMBER &&
+      task.createdById !== currentUser.id
+    ) {
+      throw new ForbiddenException('You can only edit your own tasks');
+    }
+
+    Object.assign(task, updateTaskDto);
+    const updatedTask = await this.taskRepository.save(task);
+
+    const taskWithRelations = await this.taskRepository.findOne({
+      where: { id: updatedTask.id },
+      relations: ['createdBy', 'assignee'],
+    });
+
+    if (!taskWithRelations) {
+      throw new Error('Failed to load task after update');
+    }
+
+    return this.toDto(taskWithRelations);
   }
 
-  private checkAccess(task: Task, currentUser: User): void {
-    // Ensure task belongs to user's organization (defense in depth)
-    if (task.organizationId !== currentUser.organizationId) {
-      throw new ForbiddenException('Access denied');
+  async remove(id: string, currentUser: User): Promise<void> {
+    const task = await this.taskRepository.findOne({
+      where: { id, organizationId: currentUser.organizationId },
+    });
+
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
-    // MEMBER can only access tasks they're involved with
-    if (currentUser.role === UserRole.MEMBER) {
-      const isCreator = task.createdById === currentUser.id;
-      const isAssignee = task.assigneeId === currentUser.id;
-
-      if (!isCreator && !isAssignee) {
-        throw new ForbiddenException('Access denied');
-      }
+    // Members can only delete their own tasks
+    if (
+      currentUser.role === UserRole.MEMBER &&
+      task.createdById !== currentUser.id
+    ) {
+      throw new ForbiddenException('You can only delete your own tasks');
     }
+
+    await this.taskRepository.remove(task);
   }
 
   private toDto(task: Task): TaskDto {
     return {
       id: task.id,
       title: task.title,
-      description: task.description || undefined,
+      description: task.description,
       completed: task.completed,
       createdById: task.createdById,
       createdByName: `${task.createdBy.firstName} ${task.createdBy.lastName}`,
-      assigneeId: task.assigneeId || undefined,
+      assigneeId: task.assigneeId,
       assigneeName: task.assignee
         ? `${task.assignee.firstName} ${task.assignee.lastName}`
         : undefined,
