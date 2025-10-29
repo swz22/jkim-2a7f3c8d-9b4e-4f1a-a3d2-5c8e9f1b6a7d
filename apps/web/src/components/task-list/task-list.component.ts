@@ -20,10 +20,16 @@ export class TaskListComponent implements OnInit {
   isLoading = false;
   errorMessage = '';
   showCreateForm = false;
+  editingTaskId: string | null = null;
 
   currentUser = this.authService.currentUser;
 
   createTaskForm = this.fb.group({
+    title: ['', [Validators.required]],
+    description: [''],
+  });
+
+  editTaskForm = this.fb.group({
     title: ['', [Validators.required]],
     description: [''],
   });
@@ -75,6 +81,48 @@ export class TaskListComponent implements OnInit {
         this.errorMessage = error.error?.message || 'Failed to create task';
       },
     });
+  }
+
+  onStartEdit(task: TaskDto): void {
+    this.editingTaskId = task.id;
+    this.editTaskForm.patchValue({
+      title: task.title,
+      description: task.description || '',
+    });
+  }
+
+  onCancelEdit(): void {
+    this.editingTaskId = null;
+    this.editTaskForm.reset();
+  }
+
+  onSaveEdit(taskId: string): void {
+    if (this.editTaskForm.invalid) {
+      return;
+    }
+
+    const title = this.editTaskForm.value.title;
+    const description = this.editTaskForm.value.description;
+
+    if (!title) {
+      return;
+    }
+
+    this.taskService
+      .updateTask(taskId, {
+        title,
+        description: description || undefined,
+      })
+      .subscribe({
+        next: () => {
+          this.editingTaskId = null;
+          this.editTaskForm.reset();
+          this.loadTasks();
+        },
+        error: (error) => {
+          this.errorMessage = error.error?.message || 'Failed to update task';
+        },
+      });
   }
 
   onToggleComplete(task: TaskDto): void {
