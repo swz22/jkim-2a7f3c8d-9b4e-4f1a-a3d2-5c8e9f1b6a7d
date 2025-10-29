@@ -1,0 +1,128 @@
+<div
+  class="min-h-screen flex items-center justify-center bg-gray-100 px-4 py-12"
+>
+  <div class="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+    <h2 class="text-2xl font-bold text-center text-gray-800 mb-6">
+      Create Your Account
+    </h2>
+
+    @if (errorMessage) {
+    <div class="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded">
+      {{ errorMessage }}
+    </div>
+    }
+
+    <form [formGroup]="registerForm" (ngSubmit)="onRegister()">
+      <div class="mb-4">
+        <label
+          for="firstName"
+          class="block text-sm font-medium text-gray-700 mb-1"
+        >
+          First Name
+        </label>
+        <input
+          id="firstName"
+          type="text"
+          formControlName="firstName"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="John"
+        />
+      </div>
+
+      <div class="mb-4">
+        <label
+          for="lastName"
+          class="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Last Name
+        </label>
+        <input
+          id="lastName"
+          type="text"
+          formControlName="lastName"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Doe"
+        />
+      </div>
+
+      <div class="mb-4">
+        <label
+          for="organizationName"
+          class="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Organization Name
+        </label>
+        <input
+          id="organizationName"
+          type="text"
+          formControlName="organizationName"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="Your Company"
+        />
+      </div>
+
+      <div class="mb-4">
+        <label for="email" class="block text-sm font-medium text-gray-700 mb-1">
+          Email
+        </label>
+        <input
+          id="email"
+          type="email"
+          formControlName="email"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="you@example.com"
+        />
+        @if (registerForm.get('email')?.invalid &&
+        registerForm.get('email')?.touched) {
+        <p class="mt-1 text-sm text-red-600">Please enter a valid email</p>
+        }
+      </div>
+
+      <div class="mb-6">
+        <label
+          for="password"
+          class="block text-sm font-medium text-gray-700 mb-1"
+        >
+          Password
+        </label>
+        <input
+          id="password"
+          type="password"
+          formControlName="password"
+          class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          placeholder="••••••••"
+        />
+        @if (registerForm.get('password')?.invalid &&
+        registerForm.get('password')?.touched) {
+        <p class="mt-1 text-sm text-red-600">
+          Password must be at least 6 characters
+        </p>
+        }
+      </div>
+
+      <button
+        type="submit"
+        [disabled]="registerForm.invalid || isLoading"
+        class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        @if (isLoading) {
+        <span>Creating account...</span>
+        } @else {
+        <span>Create Account</span>
+        }
+      </button>
+    </form>
+
+    <div class="mt-6 text-center">
+      <p class="text-sm text-gray-600">
+        Already have an account?
+        <a
+          routerLink="/login"
+          class="text-blue-600 hover:text-blue-700 font-medium"
+        >
+          Sign in
+        </a>
+      </p>
+    </div>
+  </div>
+</div>
