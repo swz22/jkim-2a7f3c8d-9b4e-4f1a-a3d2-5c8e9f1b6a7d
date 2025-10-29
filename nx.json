@@ -36,8 +36,7 @@
       "plugin": "@nx/jest/plugin",
       "options": {
         "targetName": "test"
-      },
-      "exclude": ["apps/turbovets-task-manager-e2e/**/*"]
+      }
     }
   ],
   "targetDefaults": {
