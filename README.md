@@ -2,7 +2,7 @@
 
 A secure, role-based task management system demonstrating enterprise-grade authentication, authorization, and multi-tenant data isolation.
 
-**GitHub Repository:** https://github.com/swz22/turbovets-task-manager
+**GitHub Repository:** https://github.com/swz22/jkim-2a7f3c8d-9b4e-4f1a-a3d2-5c8e9f1b6a7d
 
 ---
 
@@ -31,6 +31,15 @@ docker-compose up -d
 npm run dev
 ```
 
+**Alternative: Run separately in different terminals**
+
+```bash
+# Terminal 1 - Backend (NestJS)
+npx nx serve api
+
+# Terminal 2 - Frontend (Angular)
+npx nx serve web
+
 **Access the application:**
 
 - Frontend: http://localhost:4200
@@ -49,28 +58,30 @@ npm run dev
 
 ### Technology Stack
 
-**Backend:** NestJS + TypeORM + PostgreSQL  
-**Frontend:** Angular 18 (standalone components) + TailwindCSS  
+**Backend:** NestJS + TypeORM + PostgreSQL
+**Frontend:** Angular 18 (standalone components) + TailwindCSS
 **Infrastructure:** NX Monorepo + Docker
 
 ### Monorepo Structure
 
 ```
+
 turbovets-task-manager/
 ├── apps/
-│   ├── api/                 # NestJS backend
-│   │   ├── auth/           # JWT authentication
-│   │   ├── database/       # TypeORM entities
-│   │   ├── task/           # Task CRUD operations
-│   │   └── user/           # User management
-│   │
-│   └── web/                # Angular frontend
-│       ├── components/     # Login, Tasks, Users
-│       ├── services/       # API integration
-│       └── guards/         # Route protection
+│ ├── api/ # NestJS backend
+│ │ ├── auth/ # JWT authentication
+│ │ ├── database/ # TypeORM entities
+│ │ ├── task/ # Task CRUD operations
+│ │ └── user/ # User management
+│ │
+│ └── web/ # Angular frontend
+│ ├── components/ # Login, Tasks, Users
+│ ├── services/ # API integration
+│ └── guards/ # Route protection
 │
-└── libs/shared-types/      # Shared DTOs and types
-```
+└── libs/shared-types/ # Shared DTOs and types
+
+````
 
 ### Database Design
 
@@ -95,7 +106,7 @@ All database queries filter by `organizationId`:
 const tasks = await this.taskRepository.find({
   where: { organizationId: currentUser.organizationId },
 });
-```
+````
 
 This prevents data leakage between organizations and enables true multi-tenant architecture.
 
