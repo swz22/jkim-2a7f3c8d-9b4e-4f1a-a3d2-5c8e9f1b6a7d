@@ -3,6 +3,8 @@ import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { DatabaseModule } from '../database/database.module';
 import { AuthModule } from '../auth/auth.module';
+import { TaskModule } from '../task/task.module';
+import { UserModule } from '../user/user.module';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { AppController } from './app.controller';
@@ -16,6 +18,8 @@ import { AppService } from './app.service';
     }),
     DatabaseModule,
     AuthModule,
+    TaskModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [
