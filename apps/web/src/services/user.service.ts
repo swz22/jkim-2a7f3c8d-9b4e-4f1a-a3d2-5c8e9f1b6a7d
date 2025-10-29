@@ -1,7 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { UserDto, AddUserDto } from '@turbovets-task-manager/shared-types';
+import {
+  UserDto,
+  AddUserDto,
+  AddUserResponseDto,
+} from '@turbovets-task-manager/shared-types';
 
 @Injectable({
   providedIn: 'root',
@@ -18,7 +22,7 @@ export class UserService {
     return this.http.get<UserDto>(`${this.API_URL}/${id}`);
   }
 
-  addUser(user: AddUserDto): Observable<UserDto> {
-    return this.http.post<UserDto>(this.API_URL, user);
+  addUser(user: AddUserDto): Observable<AddUserResponseDto> {
+    return this.http.post<AddUserResponseDto>(this.API_URL, user);
   }
 }

@@ -62,3 +62,8 @@ export interface AddUserDto {
   lastName: string;
   role: UserRole;
 }
+
+export interface AddUserResponseDto {
+  user: UserDto;
+  tempPassword: string;
+}

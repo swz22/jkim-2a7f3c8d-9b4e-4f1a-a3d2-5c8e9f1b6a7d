@@ -8,7 +8,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { User, UserRole } from '../database/entities/user.entity';
-import { AddUserDto, UserDto } from '@turbovets-task-manager/shared-types';
+import {
+  AddUserDto,
+  UserDto,
+  AddUserResponseDto,
+} from '@turbovets-task-manager/shared-types';
 
 @Injectable()
 export class UserService {
@@ -17,7 +21,10 @@ export class UserService {
     private userRepository: Repository<User>
   ) {}
 
-  async addUser(addUserDto: AddUserDto, currentUser: User): Promise<UserDto> {
+  async addUser(
+    addUserDto: AddUserDto,
+    currentUser: User
+  ): Promise<AddUserResponseDto> {
     // Only OWNER and ADMIN can add users
     if (currentUser.role === UserRole.MEMBER) {
       throw new ForbiddenException('Only owners and admins can add users');
@@ -64,9 +71,15 @@ export class UserService {
     }
 
     // In production, send email with temp password
-    console.log(`Temporary password for ${email}: ${tempPassword}`);
+    console.log('\n=================================');
+    console.log(`🔑 TEMPORARY PASSWORD for ${email}`);
+    console.log(`Password: ${tempPassword}`);
+    console.log('=================================\n');
 
-    return this.toDto(userWithOrg);
+    return {
+      user: this.toDto(userWithOrg),
+      tempPassword,
+    };
   }
 
   async findAllInOrganization(currentUser: User): Promise<UserDto[]> {

@@ -100,10 +100,9 @@ export class UsersComponent implements OnInit {
         role: formValue.role,
       })
       .subscribe({
-        next: (user) => {
-          this.successMessage = `User ${user.email} added successfully!`;
-          this.tempPassword =
-            'Check backend console logs for temporary password';
+        next: (response) => {
+          this.successMessage = `User ${response.user.email} added successfully!`;
+          this.tempPassword = response.tempPassword;
           this.addUserForm.reset({ role: UserRole.MEMBER });
           this.loadUsers();
         },

@@ -1,33 +1,37 @@
-import { Controller, Get, Post, Body, Param } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
 import { UserService } from './user.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { User, UserRole } from '../database/entities/user.entity';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { AddUserDto, UserDto } from '@turbovets-task-manager/shared-types';
+import { User } from '../database/entities/user.entity';
+import {
+  AddUserDto,
+  UserDto,
+  AddUserResponseDto,
+} from '@turbovets-task-manager/shared-types';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard)
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(private userService: UserService) {}
 
   @Post()
-  @Roles(UserRole.OWNER, UserRole.ADMIN)
-  addUser(
+  async addUser(
     @Body() addUserDto: AddUserDto,
-    @CurrentUser() user: User
-  ): Promise<UserDto> {
-    return this.userService.addUser(addUserDto, user);
+    @CurrentUser() currentUser: User
+  ): Promise<AddUserResponseDto> {
+    return this.userService.addUser(addUserDto, currentUser);
   }
 
   @Get()
-  findAll(@CurrentUser() user: User): Promise<UserDto[]> {
-    return this.userService.findAllInOrganization(user);
+  async findAll(@CurrentUser() currentUser: User): Promise<UserDto[]> {
+    return this.userService.findAllInOrganization(currentUser);
   }
 
   @Get(':id')
-  findOne(
+  async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: User
+    @CurrentUser() currentUser: User
   ): Promise<UserDto> {
-    return this.userService.findOne(id, user);
+    return this.userService.findOne(id, currentUser);
   }
 }
