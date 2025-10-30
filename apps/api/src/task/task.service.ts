@@ -59,26 +59,12 @@ export class TaskService {
   }
 
   async findAll(currentUser: User): Promise<TaskDto[]> {
-    let tasks: Task[];
-
-    if (currentUser.role === UserRole.MEMBER) {
-      // Members only see their own tasks
-      tasks = await this.taskRepository.find({
-        where: {
-          organizationId: currentUser.organizationId,
-          createdById: currentUser.id,
-        },
-        relations: ['createdBy', 'assignee'],
-        order: { createdAt: 'DESC' },
-      });
-    } else {
-      // Owners and Admins see all tasks in their organization
-      tasks = await this.taskRepository.find({
-        where: { organizationId: currentUser.organizationId },
-        relations: ['createdBy', 'assignee'],
-        order: { createdAt: 'DESC' },
-      });
-    }
+    // All users see all tasks in their organization
+    const tasks = await this.taskRepository.find({
+      where: { organizationId: currentUser.organizationId },
+      relations: ['createdBy', 'assignee'],
+      order: { createdAt: 'DESC' },
+    });
 
     return tasks.map((task) => this.toDto(task));
   }
@@ -91,14 +77,6 @@ export class TaskService {
 
     if (!task) {
       throw new NotFoundException('Task not found');
-    }
-
-    // Members can only view their own tasks
-    if (
-      currentUser.role === UserRole.MEMBER &&
-      task.createdById !== currentUser.id
-    ) {
-      throw new ForbiddenException('You can only view your own tasks');
     }
 
     return this.toDto(task);
