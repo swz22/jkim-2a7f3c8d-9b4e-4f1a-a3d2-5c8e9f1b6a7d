@@ -18,8 +18,8 @@ A secure, role-based task management system demonstrating enterprise-grade authe
 
 ```bash
 # 1. Clone repository
-git clone https://github.com/swz22/turbovets-task-manager.git
-cd turbovets-task-manager
+git clone https://github.com/swz22/jkim-2a7f3c8d-9b4e-4f1a-a3d2-5c8e9f1b6a7d.git
+cd jkim-2a7f3c8d-9b4e-4f1a-a3d2-5c8e9f1b6a7d
 
 # 2. Install dependencies
 npm install
@@ -39,6 +39,7 @@ npx nx serve api
 
 # Terminal 2 - Frontend (Angular)
 npx nx serve web
+```
 
 **Access the application:**
 
@@ -81,7 +82,7 @@ turbovets-task-manager/
 │
 └── libs/shared-types/ # Shared DTOs and types
 
-````
+```
 
 ### Database Design
 
@@ -106,7 +107,7 @@ All database queries filter by `organizationId`:
 const tasks = await this.taskRepository.find({
   where: { organizationId: currentUser.organizationId },
 });
-````
+```
 
 This prevents data leakage between organizations and enables true multi-tenant architecture.
 
